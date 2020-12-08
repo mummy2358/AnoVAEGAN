@@ -6,6 +6,8 @@ from keras.optimizers import RMSprop
 import keras as K
 import matplotlib.pyplot as plt
 
+import tensorflow as tf
+
 import sys
 
 import numpy as np
@@ -32,7 +34,11 @@ class GAN:
         self.combined.compile(optimizer=optimizer,loss='binary_crossentropy')
         
     
-    #def VAE_loss(self,):
+    def VAE_loss(self,gen_img,label_img,mu,log_var):
+        # mse + KL_loss
+        # kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+        mse=tf.square(tf.add(gen_img,-label_img))
+        KL_loss=tf.reduce_mean(-0.5*tf.reduce_sum(1+log_var-tf.square(mu)-tf.exp(log_var),axis=1),axis=0)
     
     def D_builder(self):
         # build a simple discriminator for AnoGan
@@ -63,7 +69,7 @@ class GAN:
         return Model(D_input_image,fc)
     
     def coding_op(self,tensorlist):
-        # noise,log_sigma,mu
+        # noise,log_var,mu
         
         return Add()([Multiply()([tensorlist[0],K.backend.exp(0.5*tensorlist[1])]),tensorlist[2]])
     
@@ -94,13 +100,12 @@ class GAN:
         fc=Dense(2*latent_dim)(conv4)
         
         
-        mu, log_sigma = Lambda(lambda x : [x[:,latent_dim:],x[:,:latent_dim]])(fc)
+        mu, log_var = Lambda(lambda x : [x[:,latent_dim:],x[:,:latent_dim]])(fc)
         noise=Input(shape=(latent_dim,))
         
         
-        code=Lambda(self.coding_op)([noise,log_sigma,mu])
+        code=Lambda(self.coding_op)([noise,log_var,mu])
         
-        # code=noise*sigma+mu
         
         de_input=Dense(int(encoder_shape[-3]) * int(encoder_shape[-2]) * 16)(code)
         de_input=Reshape([int(encoder_shape[-3]), int(encoder_shape[-2]), 16])(de_input)
