@@ -64,12 +64,16 @@ if __name__=='__main__':
     max_epoch=100
     save_epoch=10
     
-    filename='VAE_gan.h5'
+    filename='VAE_gan.model'
     loader0=dl.data_loader(root='simple_pool_hmw2',hwc=(112,112,3))
     iterator0=loader0.train_next_batch(batch_size)
     
+    log_file='losses.model'
+    
     gan0=model.GAN(hwc=(112,112,3),latent_dim=latent_dim,lr=1e-4)
     
+    
+    loss_tracking={"loss_D":[],"loss_G":[]}
     for e in range(max_epoch):
         loss_D_epoch=0
         loss_G_epoch=0
@@ -78,7 +82,7 @@ if __name__=='__main__':
             numb=np.shape(b_inputs)[0]
             
             b_noise=np.random.normal(size=(numb,latent_dim))
-            gen_img=gan0.VAE.predict([b_inputs,b_noise])
+            gen_img,mu,log_var=gan0.VAE.predict([b_inputs,b_noise])
             
             valid=np.ones(shape=(numb,1))
             fake=np.zeros(shape=(numb,1))
@@ -87,7 +91,7 @@ if __name__=='__main__':
             loss_fake=gan0.discriminator.train_on_batch(gen_img,fake)
             loss_D = 0.5 * np.add(loss_real, loss_fake)
             
-            loss_G = gan0.combined.train_on_batch([b_inputs,b_noise],valid)
+            loss_G = gan0.combined.train_on_batch(x={'input_img':b_inputs,'input_noise':b_noise,'label_img':b_outputs},y=None)
             
             loss_D_epoch+=loss_D
             loss_G_epoch+=loss_G
@@ -96,10 +100,14 @@ if __name__=='__main__':
         loss_G_epoch=loss_G_epoch/math.ceil(len(loader0.train_names)/batch_size)
         print('epoch '+str(e+1)+': D '+str(loss_D_epoch)+'    G '+str(loss_G_epoch))
         
+        loss_tracking['loss_D'].append(loss_D_epoch)
+        loss_tracking['loss_G'].append(loss_G_epoch)
+        
         if (e+1)%save_epoch==0:
             print('saveing model to '+filename+' ...')
-            final_save(gan0,'VAE_gan.model')
-    
+            final_save(gan0,filename)
+            print('saving loss to '+log_file+' ...')
+            final_save(loss_tracking,log_file)
     
     
     

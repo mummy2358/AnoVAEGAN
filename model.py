@@ -16,35 +16,36 @@ import numpy as np
 class GAN:
     def __init__(self,hwc=(224,224,3),latent_dim=20,lr=1e-4):
         self.hwc=hwc
-        input_img=Input(shape=self.hwc)
-        input_noise=Input(shape=(latent_dim,))
-        
+        input_img=Input(shape=self.hwc,name='input_img')
         optimizer=RMSprop(lr)
-        
-        self.discriminator=self.D_builder()
+        self.discriminator=self.D_builder(input_img)
         self.discriminator.compile(optimizer=optimizer,loss='binary_crossentropy')
         
+        input_noise=Input(shape=(latent_dim,),name='input_noise')
+        label_img=Input(shape=self.hwc,name='label_img')
         self.discriminator.trainable=False
+        
         self.VAE=self.VAE_builder(latent_dim)
         
-        gen_img=self.VAE([input_img,input_noise])
+        gen_img,mu,log_var=self.VAE([input_img,input_noise])
         validity=self.discriminator(gen_img)
         
-        self.combined=Model(inputs=[input_img,input_noise],outputs=validity)
-        self.combined.compile(optimizer=optimizer,loss='binary_crossentropy')
+        # construct the module for loss computing
+        self.combined=Model(inputs=[input_img,input_noise,label_img],outputs=validity)
+        combined_loss=self.VAE_loss(gen_img,label_img,mu,log_var,KL_ratio=0.5)
+        self.combined.add_loss(combined_loss)
+        self.combined.compile(optimizer=optimizer)
         
-    
+        
     def VAE_loss(self,gen_img,label_img,mu,log_var,KL_ratio=0.1):
         # mse + KL_loss
-        # kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
         mse=tf.reduce_mean(tf.square(tf.add(gen_img,-label_img)))
         KL_loss=tf.reduce_mean(-0.5*tf.reduce_sum(1+log_var-tf.square(mu)-tf.exp(log_var),axis=1),axis=0)
         return mse+KL_ratio*KL_loss
         
-    
-    def D_builder(self):
+        
+    def D_builder(self,D_input_image):
         # build a simple discriminator for AnoGan
-        D_input_image=Input(shape=self.hwc)
         conv1=Conv2D(filters=64,kernel_size=3,strides=2)(D_input_image)
         conv1=LeakyReLU()(conv1)
         conv1=BatchNormalization()(conv1)
@@ -72,7 +73,6 @@ class GAN:
     
     def coding_op(self,tensorlist):
         # noise,log_var,mu
-        
         return Add()([Multiply()([tensorlist[0],K.backend.exp(0.5*tensorlist[1])]),tensorlist[2]])
     
     def VAE_builder(self,latent_dim):
@@ -136,9 +136,4 @@ class GAN:
         de_outputs=Conv2D(3,3,padding='same',activation='tanh')(de_conv2_2)
         
         
-        return Model(inputs=[input_img,noise],outputs=de_outputs)
-    
-    
-    
-    
-    
+        return Model(inputs=[input_img,noise],outputs=[de_outputs,mu,log_var])
