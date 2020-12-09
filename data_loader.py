@@ -149,7 +149,6 @@ class data_loader:
                     if re.search(key,name_prefix):
                         batch_reweight[-1]=batch_reweight[-1]*self.reweight_map[key]
             
-            
             inputs=self.rect_dropout(testimg,0.4,0.4)
             outputs=testimg
             
