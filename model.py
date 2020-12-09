@@ -34,11 +34,13 @@ class GAN:
         self.combined.compile(optimizer=optimizer,loss='binary_crossentropy')
         
     
-    def VAE_loss(self,gen_img,label_img,mu,log_var):
+    def VAE_loss(self,gen_img,label_img,mu,log_var,KL_ratio=0.1):
         # mse + KL_loss
         # kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
-        mse=tf.square(tf.add(gen_img,-label_img))
+        mse=tf.reduce_mean(tf.square(tf.add(gen_img,-label_img)))
         KL_loss=tf.reduce_mean(-0.5*tf.reduce_sum(1+log_var-tf.square(mu)-tf.exp(log_var),axis=1),axis=0)
+        return mse+KL_ratio*KL_loss
+        
     
     def D_builder(self):
         # build a simple discriminator for AnoGan
