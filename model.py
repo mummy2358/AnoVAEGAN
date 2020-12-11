@@ -13,6 +13,16 @@ import sys
 import numpy as np
 
 
+def coding_op(tensorlist):
+    # noise,log_var,mu
+    return tf.add(tf.multiply(tensorlist[0],tf.exp(0.5*tensorlist[1])),tensorlist[2])
+    
+def VAE_loss(gen_img,label_img,mu,log_var,KL_ratio=0.1):
+    # mse + KL_loss
+    mse=tf.reduce_mean(tf.square(tf.add(gen_img,-label_img)))
+    KL_loss=tf.reduce_mean(-0.5*tf.reduce_sum(1+log_var-tf.square(mu)-tf.exp(log_var),axis=1),axis=0)
+    return mse+KL_ratio*KL_loss
+
 class GAN:
     def __init__(self,hwc=(224,224,3),latent_dim=20,lr=1e-4):
         self.hwc=hwc
@@ -32,7 +42,7 @@ class GAN:
         
         # construct the module for loss computing
         self.combined=Model(inputs=[input_img,input_noise,label_img],outputs=validity)
-        combined_loss=self.VAE_loss(gen_img,label_img,mu,log_var,KL_ratio=0.5)
+        combined_loss=VAE_loss(gen_img,label_img,mu,log_var,KL_ratio=0.5)
         self.combined.add_loss(combined_loss)
         self.combined.compile(optimizer=optimizer)
         
@@ -71,9 +81,6 @@ class GAN:
         
         return Model(D_input_image,fc)
     
-    def coding_op(self,tensorlist):
-        # noise,log_var,mu
-        return Add()([Multiply()([tensorlist[0],K.backend.exp(0.5*tensorlist[1])]),tensorlist[2]])
     
     def VAE_builder(self,latent_dim):
         # build a VAE as generator
@@ -101,13 +108,10 @@ class GAN:
         conv4=Flatten()(conv4)
         fc=Dense(2*latent_dim)(conv4)
         
-        
         mu, log_var = Lambda(lambda x : [x[:,latent_dim:],x[:,:latent_dim]])(fc)
         noise=Input(shape=(latent_dim,))
         
-        
-        code=Lambda(self.coding_op)([noise,log_var,mu])
-        
+        code=Lambda(coding_op)([noise,log_var,mu])
         
         de_input=Dense(int(encoder_shape[-3]) * int(encoder_shape[-2]) * 16)(code)
         de_input=Reshape([int(encoder_shape[-3]), int(encoder_shape[-2]), 16])(de_input)
