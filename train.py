@@ -8,12 +8,12 @@ import math
 import pickle
 import utils
 # system settings
-os.environ['CUDA_VISIBLE_DEVICES']='0'
+os.environ['CUDA_VISIBLE_DEVICES']='1'
 
 if __name__=='__main__':
-    latent_dim=20
-    batch_size=4
-    max_epoch=500
+    latent_dim=128
+    batch_size=8
+    max_epoch=10000
     save_epoch=10
     
     loader0=dl.data_loader(root='simple_pool_hmw2',hwc=(112,112,3))
@@ -51,7 +51,7 @@ if __name__=='__main__':
             loss_fake=gan0.discriminator.train_on_batch(gen_img,fake)
             loss_D = 0.5 * np.add(loss_real, loss_fake)
             
-            loss_G = gan0.combined.train_on_batch(x={'input_img':b_inputs,'input_noise':b_noise,'label_img':b_outputs},y=None)
+            loss_G = gan0.combined.train_on_batch(x={'input_img':b_inputs,'input_noise':b_noise,'label_img':b_outputs,'label_D':valid},y=None)
             
             loss_D_epoch+=loss_D
             loss_G_epoch+=loss_G

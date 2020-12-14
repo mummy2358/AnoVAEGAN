@@ -17,14 +17,15 @@ def coding_op(tensorlist):
     # noise,log_var,mu
     return tf.add(tf.multiply(tensorlist[0],tf.exp(0.5*tensorlist[1])),tensorlist[2])
     
-def VAE_loss(gen_img,label_img,mu,log_var,KL_ratio=0.1):
-    # mse + KL_loss
+def VAE_loss(gen_img,label_img,D_pred,D_label,mu,log_var,G_ratio=0.1,KL_ratio=0.1,mse_ratio=1.0):
+    # G_loss + KL_loss + mse
+    G_loss=tf.reduce_mean(K.losses.binary_crossentropy(y_true=D_label,y_pred=D_pred))
     mse=tf.reduce_mean(tf.square(tf.add(gen_img,-label_img)))
     KL_loss=tf.reduce_mean(-0.5*tf.reduce_sum(1+log_var-tf.square(mu)-tf.exp(log_var),axis=1),axis=0)
-    return mse+KL_ratio*KL_loss
+    return G_ratio*G_loss+KL_ratio*KL_loss+mse*mse_ratio
 
 class GAN:
-    def __init__(self,hwc=(224,224,3),latent_dim=20,lr=1e-4):
+    def __init__(self,hwc=(224,224,3),latent_dim=128,lr=1e-4):
         self.hwc=hwc
         input_img=Input(shape=self.hwc,name='input_img')
         optimizer=RMSprop(lr)
@@ -33,6 +34,8 @@ class GAN:
         
         input_noise=Input(shape=(latent_dim,),name='input_noise')
         label_img=Input(shape=self.hwc,name='label_img')
+        label_D=Input(shape=(1,),name='label_D')
+        
         self.discriminator.trainable=False
         
         self.VAE=self.VAE_builder(latent_dim)
@@ -40,18 +43,14 @@ class GAN:
         gen_img,mu,log_var=self.VAE([input_img,input_noise])
         validity=self.discriminator(gen_img)
         
+        
+        
         # construct the module for loss computing
-        self.combined=Model(inputs=[input_img,input_noise,label_img],outputs=validity)
-        combined_loss=VAE_loss(gen_img,label_img,mu,log_var,KL_ratio=0.5)
+        self.combined=Model(inputs=[input_img,input_noise,label_img,label_D],outputs=[validity,mu,log_var])
+        combined_loss=VAE_loss(gen_img,label_img,validity,label_D,mu,log_var,G_ratio=0.1,KL_ratio=0.1,mse_ratio=1.0)
         self.combined.add_loss(combined_loss)
         self.combined.compile(optimizer=optimizer)
         
-        
-    def VAE_loss(self,gen_img,label_img,mu,log_var,KL_ratio=0.1):
-        # mse + KL_loss
-        mse=tf.reduce_mean(tf.square(tf.add(gen_img,-label_img)))
-        KL_loss=tf.reduce_mean(-0.5*tf.reduce_sum(1+log_var-tf.square(mu)-tf.exp(log_var),axis=1),axis=0)
-        return mse+KL_ratio*KL_loss
         
         
     def D_builder(self,D_input_image):
@@ -141,3 +140,5 @@ class GAN:
         
         
         return Model(inputs=[input_img,noise],outputs=[de_outputs,mu,log_var])
+
+gan1=GAN()

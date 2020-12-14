@@ -19,7 +19,8 @@ def val(img_dir,model,hwc,latent_dim,dst_dir='./val_results'):
     loader1=dl.data_loader(img_dir,hwc,train_val=0,add_val=img_dir)
     for b in range(len(loader1.val_names)):
         b_img=loader1.get_val(index=(b,b+1))
-        input_noise=np.random.normal(size=(1,latent_dim,))
+        #input_noise=np.random.normal(size=(1,int(224/16),int(224/16),latent_dim))
+        input_noise=np.random.normal(size=(1,latent_dim))
         gen_img,mu,log_var=model.predict([b_img,input_noise])
         
         save_img=loader1.postprocess_img(gen_img[0])
@@ -78,4 +79,4 @@ def VAE_loss(gen_img,label_img,mu,log_var,KL_ratio=0.1):
 VAE=K.models.load_model('G1.h5',custom_objects={'VAE_loss':VAE_loss,'coding_op':coding_op,'tf':tf})
 VAE.summary()
 print('model loaded!')
-val('.\\val_samples\\',VAE,hwc=(112,112,3),latent_dim=20)
+val('.\\val_samples\\',VAE,hwc=(112,112,3),latent_dim=128)
